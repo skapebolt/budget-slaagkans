@@ -1,0 +1,178 @@
+<!DOCTYPE html>
+<html lang="nl">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Budget slaagkans – normaalverdeling</title>
+<style>
+:root{--bg:#f7f8fa;--card:#fff;--tx:#1b2430;--mut:#6b7686;--line:#dfe3ea;--ac:#2563eb;--fill:rgba(37,99,235,.22);--warn:#d97706;--bgt:#16a34a;--tgt:#3b82f6;
+box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){--bg:#10141b;--card:#1a212c;--tx:#e8ecf2;--mut:#8f9bad;--line:#2b3442;--ac:#60a5fa;--fill:rgba(96,165,250,.28);--warn:#fbbf24}}
+:root[data-theme="dark"]{--bg:#10141b;--card:#1a212c;--tx:#e8ecf2;--mut:#8f9bad;--line:#2b3442;--ac:#60a5fa;--fill:rgba(96,165,250,.28);--warn:#fbbf24}
+html{scroll-padding-top:env(safe-area-inset-top,0px)}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--tx);font:15px/1.5 system-ui,-apple-system,"Segoe UI",Roboto,sans-serif}
+main{max-width:900px;margin:0 auto;padding:16px}
+h1{font-size:1.25rem;margin:0 0 4px}
+p.sub{margin:0 0 14px;color:var(--mut);font-size:.9rem}
+.card{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:14px;margin-bottom:14px}
+.inputs{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:12px}
+label{display:block;font-size:.8rem;color:var(--mut);margin-bottom:4px}
+input,select{width:100%;padding:9px 10px;font-size:1rem;border:1px solid var(--line);border-radius:8px;background:var(--bg);color:var(--tx)}
+#readout{font-size:1.05rem;margin-bottom:6px;min-height:1.6em}
+#readout b{color:var(--ac)}
+.wrap{position:relative}
+svg{width:100%;height:auto;display:block;touch-action:none;cursor:crosshair}
+#tip{position:absolute;pointer-events:none;background:var(--card);border:1px solid var(--line);border-radius:8px;padding:6px 10px;font-size:.85rem;box-shadow:0 2px 8px rgba(0,0,0,.15);white-space:nowrap;transform:translate(-50%,-110%);display:none}
+.tbl{overflow-x:auto}
+table{width:100%;border-collapse:collapse;font-size:.92rem}
+th,td{text-align:right;padding:7px 10px;border-bottom:1px solid var(--line)}
+th:first-child,td:first-child{text-align:left}
+th{color:var(--mut);font-weight:600;font-size:.8rem}
+tr.hl td{background:var(--fill)}
+tr[data-q]{cursor:pointer}
+.err{color:var(--warn);font-size:.85rem;min-height:1.2em}
+</style>
+</head>
+<body>
+<main>
+<h1>Budget en slaagkans</h1>
+<p class="sub">Vul P50 en de standaardafwijking in. Beweeg over de grafiek om te zien welke omzet bij welke slaagkans (PXX) hoort.</p>
+
+<div class="card" style="font-size:.92rem">
+  <b>Wat betekent dit?</b>
+  <p style="margin:6px 0"><b>P50-omzet</b> is de omzet waar je het meest op rekent: de kans dat je er <i>boven</i> eindigt is even groot als de kans dat je er <i>onder</i> eindigt (50/50). Je kan het zien als je beste gok voor volgend jaar.</p>
+  <p style="margin:6px 0"><b>Standaardafwijking</b> geeft aan hoeveel de echte omzet normaal kan afwijken van die gok, door weer, consumentenvertrouwen, acties, enz. Hoe groter, hoe onzekerder de omzet.</p>
+  <p style="margin:6px 0"><b>PXX</b> is de omzet die je met XX% kans <i>haalt of overtreft</i>. Hoe hoger het getal, hoe voorzichtiger (en lager) de omzet. Bijvoorbeeld: bij P70 haal je dat bedrag in ongeveer 7 van de 10 gevallen.</p>
+  <p style="margin:6px 0"><b style="color:var(--bgt)">BGT (budget, P70)</b> is het veilige getal waarop je plant en waaraan je je engageert. <b style="color:var(--tgt)">TGT (target, P30)</b> is het ambitieuze streefgetal: dat haal je maar in ongeveer 3 van de 10 gevallen.</p>
+</div>
+
+<div class="card">
+  <div class="inputs">
+    <div><label for="mu">P50-omzet</label><input id="mu" type="number" value="100" min="1" step="any" inputmode="decimal"></div>
+    <div><label for="sg">Standaardafwijking</label><input id="sg" type="number" value="4" min="0.01" step="any" inputmode="decimal"></div>
+    <div><label for="mode">σ uitgedrukt in</label><select id="mode"><option value="pct">% van P50</option><option value="abs">absoluut bedrag</option></select></div>
+    <div><label for="unit">Eenheid</label><input id="unit" type="text" value="mio €"></div>
+  </div>
+  <div class="err" id="err"></div>
+</div>
+
+<div class="card">
+  <div id="readout"></div>
+  <div class="wrap" id="wrap"><svg id="svg" viewBox="0 0 800 380" role="img" aria-label="Normaalverdeling van de omzet"></svg><div id="tip"></div></div>
+</div>
+
+<div class="card tbl">
+  <table><thead><tr><th>Slaagkans</th><th>Omzet</th><th>Verschil met P50</th></tr></thead><tbody id="tb"></tbody></table>
+</div>
+<p class="sub">Pxx = omzet die je met xx% kans haalt of overtreft. Bedragen zijn afgerond op hele getallen. Aanname: normaalverdeling.</p>
+</main>
+<script>
+const $=id=>document.getElementById(id);
+const svg=$('svg'),tip=$('tip'),W=800,H=380,L=20,R=20,T=58,B=60;
+const LEVELS=[5,10,20,25,30,40,50,60,70,75,80,90,95];
+let mu=100,sd=4,hoverX=null;
+
+const fmt=n=>Math.round(n).toLocaleString('nl-BE');
+const pdf=(x)=>Math.exp(-0.5*((x-mu)/sd)**2);
+function erf(x){const s=x<0?-1:1;x=Math.abs(x);const t=1/(1+0.3275911*x);
+ const y=1-(((((1.061405429*t-1.453152027)*t)+1.421413741)*t-0.284496736)*t+0.254829592)*t*Math.exp(-x*x);return s*y}
+const cdf=z=>0.5*(1+erf(z/Math.SQRT2));
+function zInv(p){let lo=-8,hi=8;for(let i=0;i<60;i++){const m=(lo+hi)/2;cdf(m)<p?lo=m:hi=m}return(lo+hi)/2}
+const valFor=q=>mu+sd*zInv(1-q/100);
+const unit=()=>$('unit').value.trim();
+
+function read(){
+  const m=parseFloat($('mu').value),s=parseFloat($('sg').value);
+  const e=$('err');
+  if(!(m>0)||!(s>0)){e.textContent='Geef een positieve P50 en standaardafwijking in.';return false}
+  e.textContent='';
+  mu=m;sd=$('mode').value==='pct'?m*s/100:s;
+  return true;
+}
+const xmin=()=>mu-4*sd,xmax=()=>mu+4*sd;
+const sx=x=>L+(x-xmin())/(xmax()-xmin())*(W-L-R);
+const sy=y=>H-B-y*(H-B-T);
+const inv=px=>xmin()+(px-L)/(W-L-R)*(xmax()-xmin());
+
+function draw(){
+  let h='';
+  const N=160,pts=[];
+  for(let i=0;i<=N;i++){const x=xmin()+(xmax()-xmin())*i/N;pts.push([x,pdf(x)])}
+  const line=pts.map((p,i)=>(i?'L':'M')+sx(p[0]).toFixed(1)+' '+sy(p[1]).toFixed(1)).join('');
+  // shaded area: x >= hoverX
+  if(hoverX!==null){
+    const a=pts.filter(p=>p[0]>=hoverX);
+    let d='M'+sx(hoverX).toFixed(1)+' '+sy(0)+'L'+sx(hoverX).toFixed(1)+' '+sy(pdf(hoverX)).toFixed(1);
+    a.forEach(p=>d+='L'+sx(p[0]).toFixed(1)+' '+sy(p[1]).toFixed(1));
+    d+='L'+sx(xmax()).toFixed(1)+' '+sy(0)+'Z';
+    h+=`<path d="${d}" fill="var(--fill)"/>`;
+  }
+  h+=`<line x1="${L}" x2="${W-R}" y1="${sy(0)}" y2="${sy(0)}" stroke="var(--line)"/>`;
+  h+=`<path d="${line}" fill="none" stroke="var(--ac)" stroke-width="2.5"/>`;
+  // PXX markers
+  LEVELS.forEach((q,i)=>{
+    const x=sx(valFor(q)),mid=q===50,ly=i%2?T-26:T-10,col=q===70?'var(--bgt)':q===30?'var(--tgt)':null,tag=q===70?'BGT':q===30?'TGT':'';
+    h+=mid?`<line x1="${x}" x2="${x}" y1="${ly+4}" y2="${sy(0)}" stroke="var(--tx)" stroke-width="4.5"/>`:`<line x1="${x}" x2="${x}" y1="${col?18:ly+4}" y2="${sy(0)}" stroke="${col||'var(--mut)'}" stroke-width="${col?3:1}" stroke-dasharray="${col?'':'3 4'}" opacity="${col?1:.6}"/>`;
+    h+=`<text x="${x}" y="${ly}" text-anchor="middle" font-size="${mid?14:11}" fill="${mid?'var(--tx)':col||'var(--mut)'}" font-weight="${mid||col?800:600}">P${q}</text>`+(tag?`<text x="${x}" y="12" text-anchor="middle" font-size="13" font-weight="800" fill="${col}">${tag}</text>`:'');
+    h+=`<text x="${x}" y="${sy(0)+(i%2?32:16)}" text-anchor="middle" font-size="${mid?13:11}" font-weight="${mid?800:400}" fill="var(--tx)">${fmt(valFor(q))}</text>`;
+  });
+  // hover line
+  if(hoverX!==null){
+    const x=sx(hoverX);
+    h+=`<line x1="${x}" x2="${x}" y1="${T}" y2="${sy(0)}" stroke="var(--warn)" stroke-width="1.5"/>`;
+    h+=`<circle cx="${x}" cy="${sy(pdf(hoverX))}" r="5" fill="var(--warn)"/>`;
+  }
+  h+=`<text x="${W/2}" y="${H-6}" text-anchor="middle" font-size="12" fill="var(--mut)">Omzet (${unit()})</text>`;
+  svg.innerHTML=h;
+}
+
+function info(x){
+  const q=(1-cdf((x-mu)/sd))*100;
+  return {q,txt:`Omzet <b>${fmt(x)} ${unit()}</b> → <b>${Math.round(q)}%</b> kans om dit te halen of te overtreffen`};
+}
+function update(){
+  if(hoverX===null)hoverX=valFor(70);
+  const i=info(hoverX);
+  $('readout').innerHTML=i.txt;
+  draw();
+  const rows=LEVELS.map(q=>{
+    const v=valFor(q),d=v-mu;
+    return `<tr data-q="${q}"${q===70?' style="color:var(--bgt);font-weight:600"':q===30?' style="color:var(--tgt);font-weight:600"':''}><td>P${q}${q===70?' · BGT':q===30?' · TGT':''}</td><td>${fmt(v)} ${unit()}</td><td>${q===50?'–':(d>0?'+':'')+fmt(d)}</td></tr>`}).join('');
+  $('tb').innerHTML=rows;
+  markRow();
+}
+function markRow(){
+  const q=Math.round(info(hoverX).q);
+  document.querySelectorAll('#tb tr').forEach(r=>r.classList.toggle('hl',+r.dataset.q===q));
+}
+function move(e){
+  const r=svg.getBoundingClientRect();
+  const px=(e.clientX-r.left)/r.width*W;
+  const x=Math.min(xmax(),Math.max(xmin(),inv(px)));
+  hoverX=x;
+  const i=info(x);
+  $('readout').innerHTML=i.txt;
+  draw();markRow();
+  tip.style.display='block';
+  tip.style.left=Math.min(r.width-60,Math.max(60,e.clientX-r.left))+'px';
+  tip.style.top=(sy(pdf(x))/H*r.height)+'px';
+  tip.innerHTML=`P${Math.round(i.q)} · ${fmt(x)} ${unit()}`;
+}
+svg.addEventListener('pointermove',move);
+svg.addEventListener('pointerdown',move);
+svg.addEventListener('pointerleave',()=>{tip.style.display='none'});
+['mu','sg','mode','unit'].forEach(id=>$(id).addEventListener('input',()=>{if(read()){hoverX=null;update()}}));
+function pickRow(e){
+  const r=e.target.closest('tr[data-q]');if(!r)return;
+  hoverX=valFor(+r.dataset.q);
+  tip.style.display='none';
+  $('readout').innerHTML=info(hoverX).txt;
+  draw();markRow();
+}
+$('tb').addEventListener('pointerover',pickRow);
+$('tb').addEventListener('click',pickRow);
+read();update();
+</script>
+</body>
+</html>
